@@ -171,6 +171,11 @@ func TestCache(t *testing.T) {
 
 		if valid {
 			crr.set(m, k, mt, c.pttl)
+			// cache must not care what plugins above it are doing, including
+			// modifying the returned message after an initial cache miss
+			if len(m.Answer) > 0 {
+				m.Answer[0] = test.A("shouldnotseeme.bad. 0 IN A 127.0.0.53")
+			}
 		}
 
 		i, _ := c.get(time.Now().UTC(), state, "dns://:53")

@@ -29,15 +29,11 @@ func newItem(m *dns.Msg, now time.Time, d time.Duration) *item {
 	i.AuthenticatedData = m.AuthenticatedData
 	i.RecursionAvailable = m.RecursionAvailable
 	i.Answer = make([]dns.RR, len(m.Answer))
+	copy(i.Answer, m.Answer)
 	i.Ns = make([]dns.RR, len(m.Ns))
+	copy(i.Ns, m.Ns)
 	i.Extra = make([]dns.RR, len(m.Extra))
 
-	for j, r := range m.Answer {
-		i.Answer[j] = dns.Copy(r)
-	}
-	for j, r := range m.Ns {
-		i.Ns[j] = dns.Copy(r)
-	}
 	// Don't copy OPT records as these are hop-by-hop.
 	j := 0
 	for _, e := range m.Extra {

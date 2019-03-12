@@ -30,6 +30,7 @@ trace [ENDPOINT-TYPE] [ENDPOINT] {
 	every AMOUNT
 	service NAME
 	client_server
+	tag key value
 }
 ~~~
 
@@ -38,6 +39,7 @@ trace [ENDPOINT-TYPE] [ENDPOINT] {
 * `service` **NAME** allows you to specify the service name reported to the tracing server.
   Default is `coredns`.
 * `client_server` will enable the `ClientServerSameSpan` OpenTracing feature.
+* `tag` is used to emit custom tags with each trace, it can be included multiple times
 
 ## Zipkin
 You can run Zipkin on a Docker host like this:

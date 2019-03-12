@@ -35,6 +35,7 @@ type trace struct {
 	tracer          ot.Tracer
 	serviceEndpoint string
 	serviceName     string
+	tags            map[string]string
 	clientServer    bool
 	every           uint64
 	count           uint64
@@ -119,6 +120,10 @@ func (t *trace) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) 
 	span.SetTag(tagName, req.Name())
 	span.SetTag(tagType, req.Type())
 	span.SetTag(tagRcode, rcode.ToString(rw.Rcode))
+
+	for key, value := range t.tags {
+		span.SetTag(key, value)
+	}
 
 	return status, err
 }

@@ -89,6 +89,15 @@ func traceParse(c *caddy.Controller) (*trace, error) {
 				if err != nil {
 					return nil, err
 				}
+			case "tag":
+				args := c.RemainingArgs()
+				if len(args) != 2 {
+					return nil, c.ArgErr()
+				}
+				if tr.tags == nil {
+					tr.tags = map[string]string{}
+				}
+				tr.tags[args[0]] = args[1]
 			}
 		}
 	}

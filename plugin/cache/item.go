@@ -33,7 +33,6 @@ func newItem(m *dns.Msg, now time.Time, d time.Duration) *item {
 	i.Ns = make([]dns.RR, len(m.Ns))
 	copy(i.Ns, m.Ns)
 	i.Extra = make([]dns.RR, len(m.Extra))
-
 	// Don't copy OPT records as these are hop-by-hop.
 	j := 0
 	for _, e := range m.Extra {

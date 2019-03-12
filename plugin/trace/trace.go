@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 
 	"github.com/coredns/coredns/plugin"
+	"github.com/coredns/coredns/plugin/metadata"
 	"github.com/coredns/coredns/plugin/metrics"
 	"github.com/coredns/coredns/plugin/pkg/dnstest"
 	"github.com/coredns/coredns/plugin/pkg/rcode"
@@ -122,10 +123,24 @@ func (t *trace) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) 
 	span.SetTag(tagRcode, rcode.ToString(rw.Rcode))
 
 	for key, value := range t.tags {
-		span.SetTag(key, value)
+		value = tagValue(ctx, value)
+		if value != "" {
+			span.SetTag(key, value)
+		}
 	}
 
 	return status, err
+}
+
+func tagValue(ctx context.Context, value string) string {
+	if len(value) > 2 && value[0] == '{' && value[len(value)-1] == '}' {
+		fetcher := metadata.ValueFunc(ctx, value[1:len(value)-1])
+		if fetcher != nil {
+			return fetcher()
+		}
+		return ""
+	}
+	return value
 }
 
 func spanName(ctx context.Context, req request.Request) string {

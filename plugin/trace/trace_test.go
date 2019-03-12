@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/coredns/coredns/plugin"
+	"github.com/coredns/coredns/plugin/metadata"
 	"github.com/coredns/coredns/plugin/pkg/dnstest"
 	"github.com/coredns/coredns/plugin/pkg/rcode"
 	"github.com/coredns/coredns/plugin/test"
@@ -15,7 +16,16 @@ import (
 	"github.com/opentracing/opentracing-go/mocktracer"
 )
 
-const server = "coolServer"
+const (
+	server                  = "coolServer"
+	staticTagName           = "staticTag"
+	staticTagValue          = "staticValue"
+	dynamicTagName          = "dynamicTag"
+	dynamicTagValue         = "{test/dynamicValue}"
+	dynamicTagResolvedValue = "resolvedValue"
+	invalidDynamicTagName   = "invalidDynamicTag"
+	invalidDynamicTagValue  = "{test/doesnotexist}"
+)
 
 func TestStartup(t *testing.T) {
 	m, err := traceParse(caddy.NewTestController("dns", `trace`))
@@ -36,17 +46,32 @@ func TestStartup(t *testing.T) {
 	}
 }
 
+type testProvider map[string]metadata.Func
+
+func (tp testProvider) Metadata(ctx context.Context, state request.Request) context.Context {
+	for k, v := range tp {
+		metadata.SetValueFunc(ctx, k, v)
+	}
+	return ctx
+}
+
 func TestTrace(t *testing.T) {
 	cases := []struct {
 		name     string
 		rcode    int
 		question *dns.Msg
 		server   string
+		tags     map[string]string
 	}{
 		{
 			name:     "NXDOMAIN",
 			rcode:    dns.RcodeNameError,
 			question: new(dns.Msg).SetQuestion("example.org.", dns.TypeA),
+			tags: map[string]string{
+				staticTagName:         staticTagValue,
+				dynamicTagName:        dynamicTagValue,
+				invalidDynamicTagName: invalidDynamicTagValue,
+			},
 		},
 		{
 			name:     "NOERROR",
@@ -68,9 +93,22 @@ func TestTrace(t *testing.T) {
 				}),
 				every:  1,
 				tracer: m,
+				tags:   tc.tags,
 			}
+
 			ctx := context.WithValue(context.TODO(), plugin.ServerCtx{}, server)
-			if _, err := tr.ServeDNS(ctx, w, tc.question); err != nil {
+
+			expectedMetadata := []metadata.Provider{
+				testProvider{dynamicTagValue[1 : len(dynamicTagValue)-1]: func() string { return dynamicTagResolvedValue }},
+			}
+
+			meta := metadata.Metadata{
+				Zones:     []string{"."},
+				Providers: expectedMetadata,
+				Next:      tr,
+			}
+
+			if _, err := meta.ServeDNS(ctx, w, tc.question); err != nil {
 				t.Fatalf("Error during tr.ServeDNS(ctx, w, %v): %v", tc.question, err)
 			}
 
@@ -93,6 +131,18 @@ func TestTrace(t *testing.T) {
 			}
 			if rootSpan.Tag(tagRcode) != rcode.ToString(tc.rcode) {
 				t.Errorf("Unexpected span tag: rootSpan.Tag(%v): want %v, got %v", tagRcode, rcode.ToString(tc.rcode), rootSpan.Tag(tagRcode))
+			}
+			if len(tc.tags) == 0 {
+				return
+			}
+			if rootSpan.Tag(staticTagName) != staticTagValue {
+				t.Errorf("Unexpected span tag: rootSpan.Tag(%v): want %v, got %v", staticTagName, staticTagValue, rootSpan.Tag(staticTagName))
+			}
+			if rootSpan.Tag(dynamicTagName) != dynamicTagResolvedValue {
+				t.Errorf("Unexpected span tag: rootSpan.Tag(%v): want %v, got %v", dynamicTagName, dynamicTagResolvedValue, rootSpan.Tag(dynamicTagName))
+			}
+			if rootSpan.Tag(invalidDynamicTagName) != nil {
+				t.Errorf("Unexpected span tag: rootSpan.Tag(%v): wanted nil, got %v", invalidDynamicTagName, rootSpan.Tag(invalidDynamicTagName))
 			}
 		})
 	}

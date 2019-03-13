@@ -37,6 +37,7 @@ type trace struct {
 	serviceEndpoint string
 	serviceName     string
 	tags            map[string]string
+	tagFetchers     map[string]metadata.Func
 	clientServer    bool
 	every           uint64
 	count           uint64
@@ -122,25 +123,26 @@ func (t *trace) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) 
 	span.SetTag(tagType, req.Type())
 	span.SetTag(tagRcode, rcode.ToString(rw.Rcode))
 
-	for key, value := range t.tags {
-		value = tagValue(ctx, value)
-		if value != "" {
-			span.SetTag(key, value)
+	for key, internalKey := range t.tags {
+		fetcher := metadata.ValueFunc(ctx, internalKey)
+		if fetcher != nil {
+			value := fetcher()
+			if value != "" {
+				span.SetTag(key, value)
+			}
 		}
 	}
 
 	return status, err
 }
 
-func tagValue(ctx context.Context, value string) string {
-	if len(value) > 2 && value[0] == '{' && value[len(value)-1] == '}' {
-		fetcher := metadata.ValueFunc(ctx, value[1:len(value)-1])
+func (t *trace) Metadata(ctx context.Context, state request.Request) context.Context {
+	for key, fetcher := range t.tagFetchers {
 		if fetcher != nil {
-			return fetcher()
+			metadata.SetValueFunc(ctx, key, fetcher)
 		}
-		return ""
 	}
-	return value
+	return ctx
 }
 
 func spanName(ctx context.Context, req request.Request) string {

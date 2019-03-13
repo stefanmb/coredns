@@ -26,7 +26,7 @@ func TestTraceParse(t *testing.T) {
 		{"trace {\n every 100\n service foobar\nclient_server\n}", false, "http://localhost:9411/api/v1/spans", 100, `foobar`, true},
 		{"trace {\n every 2\n client_server true\n}", false, "http://localhost:9411/api/v1/spans", 2, `coredns`, true},
 		{"trace {\n client_server false\n}", false, "http://localhost:9411/api/v1/spans", 1, `coredns`, false},
-		{"trace {\n tag foo bar\n}", false, "http://localhost:9411/api/v1/spans", 1, `coredns`, false},
+		{"trace {\n tag key value\n}", false, "http://localhost:9411/api/v1/spans", 1, `coredns`, false},
 		// fails
 		{`trace footype localhost:4321`, true, "", 1, "", false},
 		{"trace {\n every 2\n client_server junk\n}", true, "", 1, "", false},

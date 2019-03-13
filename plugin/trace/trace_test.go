@@ -2,6 +2,7 @@ package trace
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/coredns/coredns/plugin"
@@ -21,10 +22,10 @@ const (
 	staticTagName           = "staticTag"
 	staticTagValue          = "staticValue"
 	dynamicTagName          = "dynamicTag"
-	dynamicTagValue         = "{test/dynamicValue}"
+	dynamicTagValue         = "{test/value}"
 	dynamicTagResolvedValue = "resolvedValue"
-	invalidDynamicTagName   = "invalidDynamicTag"
-	invalidDynamicTagValue  = "{test/doesnotexist}"
+	invalidDynamicTagName   = "missingTag"
+	invalidDynamicTagValue  = "{test/doesntexist}"
 )
 
 func TestStartup(t *testing.T) {
@@ -57,20 +58,24 @@ func (tp testProvider) Metadata(ctx context.Context, state request.Request) cont
 
 func TestTrace(t *testing.T) {
 	cases := []struct {
-		name     string
-		rcode    int
-		question *dns.Msg
-		server   string
-		tags     map[string]string
+		name        string
+		rcode       int
+		question    *dns.Msg
+		server      string
+		tags        map[string]string
+		tagFetchers map[string]metadata.Func
 	}{
 		{
 			name:     "NXDOMAIN",
 			rcode:    dns.RcodeNameError,
 			question: new(dns.Msg).SetQuestion("example.org.", dns.TypeA),
 			tags: map[string]string{
-				staticTagName:         staticTagValue,
-				dynamicTagName:        dynamicTagValue,
-				invalidDynamicTagName: invalidDynamicTagValue,
+				staticTagName:         fmt.Sprintf("trace/%s", staticTagName),
+				dynamicTagName:        dynamicTagValue[1 : len(dynamicTagValue)-1],
+				invalidDynamicTagName: invalidDynamicTagValue[1 : len(dynamicTagValue)-1],
+			},
+			tagFetchers: map[string]metadata.Func{
+				fmt.Sprintf("trace/%s", staticTagName): func() string { return staticTagValue },
 			},
 		},
 		{
@@ -91,15 +96,17 @@ func TestTrace(t *testing.T) {
 					w.WriteMsg(m)
 					return tc.rcode, nil
 				}),
-				every:  1,
-				tracer: m,
-				tags:   tc.tags,
+				every:       1,
+				tracer:      m,
+				tags:        tc.tags,
+				tagFetchers: tc.tagFetchers,
 			}
 
 			ctx := context.WithValue(context.TODO(), plugin.ServerCtx{}, server)
 
 			expectedMetadata := []metadata.Provider{
 				testProvider{dynamicTagValue[1 : len(dynamicTagValue)-1]: func() string { return dynamicTagResolvedValue }},
+				tr,
 			}
 
 			meta := metadata.Metadata{

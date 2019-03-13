@@ -7,6 +7,7 @@ import (
 
 	"github.com/coredns/coredns/core/dnsserver"
 	"github.com/coredns/coredns/plugin"
+	"github.com/coredns/coredns/plugin/metadata"
 
 	"github.com/mholt/caddy"
 )
@@ -97,11 +98,31 @@ func traceParse(c *caddy.Controller) (*trace, error) {
 				if tr.tags == nil {
 					tr.tags = map[string]string{}
 				}
-				tr.tags[args[0]] = args[1]
+				if tr.tagFetchers == nil {
+					tr.tagFetchers = map[string]metadata.Func{}
+				}
+
+				internalKey, fetcher := tagFetcher(tr, args[0], args[1])
+				if fetcher != nil {
+					tr.tagFetchers[internalKey] = fetcher
+				}
+				tr.tags[args[0]] = internalKey
 			}
 		}
 	}
 	return tr, err
+}
+
+func tagFetcher(tr *trace, key string, value string) (string, metadata.Func) {
+	if len(value) > 2 && value[0] == '{' && value[len(value)-1] == '}' {
+		// We cannot get the fetcher at setup time, it has to be
+		// obtained dynamically at request time, since it may be
+		// added after the initial setup and we need a context.
+		return value[1 : len(value)-1], nil
+	}
+	return fmt.Sprintf("%s/%s", tr.Name(), key), func() string {
+		return value
+	}
 }
 
 func normalizeEndpoint(epType, ep string) (string, string, error) {

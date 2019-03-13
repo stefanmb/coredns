@@ -40,7 +40,7 @@ trace [ENDPOINT-TYPE] [ENDPOINT] {
   Default is `coredns`.
 * `client_server` will enable the `ClientServerSameSpan` OpenTracing feature.
 * `tag` is used to emit custom tags with each trace, it can be included multiple times
-  If the `metadata` plugin used the value can be dynamic, use the format `{prefix/name}`
+  If the `metadata` plugin is used the value can be dynamic, use the format `{plugin/value}`
 
 ## Zipkin
 You can run Zipkin on a Docker host like this:
